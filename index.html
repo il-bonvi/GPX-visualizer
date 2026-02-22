@@ -1328,15 +1328,20 @@ let map;
             mapContainer.addEventListener('touchend',   () => clearTimeout(lpTimer), { passive: true });
 
             // Long-press sull'altimetria
-            let elvTimer = null, elvMoved = false;
             const elevContainer = document.getElementById('elevation-chart');
+            let elvTimer = null;
+            let elvIsMoving = false;   // true solo se il dito si è mosso dopo touchstart
+            let hoverClearTimer = null;
 
             elevContainer.addEventListener('touchstart', function(e) {
                 if (e.touches.length !== 1) return;
-                elvMoved = false;
+                elvIsMoving = false;
+                clearTimeout(hoverClearTimer);
                 const touch = e.touches[0];
+
+                // Avvia timer long-press (600ms): se il dito resta fermo apre SV
                 elvTimer = setTimeout(() => {
-                    if (elvMoved) return;
+                    if (elvIsMoving) return; // si è mosso → non aprire
                     if (!window._elevXScale || !window._elevMargin) return;
                     const rect = elevContainer.getBoundingClientRect();
                     const mx = touch.clientX - rect.left - window._elevMargin.left;
@@ -1349,13 +1354,14 @@ let map;
                     }
                 }, 600);
             }, { passive: true });
-            let hoverClearTimer = null;
 
             elevContainer.addEventListener('touchmove', function(e) {
-                elvMoved = true;
+                if (e.touches.length !== 1) return;
+                elvIsMoving = true;          // il dito si è mosso: annulla long-press
                 clearTimeout(elvTimer);
                 clearTimeout(hoverClearTimer);
-                // Touch-hover: mostra quota mentre scorri
+
+                // Hover mentre scorri (solo se il dito si muove)
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
@@ -1363,17 +1369,23 @@ let map;
                 if (mx >= 0) window._updateElevHover(touch.clientX, touch.clientY, mx);
             }, { passive: true });
 
-            function clearElevHoverSafe() {
-                clearTimeout(hoverClearTimer);
+            elevContainer.addEventListener('touchend', function() {
                 clearTimeout(elvTimer);
-                // Piccolo delay così l'utente vede l'ultimo valore prima che sparisca
+                // Se l'utente non si è mai mosso (tap secco) → nascondi subito
+                // Se si è mosso (swipe) → breve delay per leggere il valore
+                const delay = elvIsMoving ? 400 : 0;
                 hoverClearTimer = setTimeout(() => {
                     if (window._clearElevHover) window._clearElevHover();
-                }, 300);
-            }
+                }, delay);
+                elvIsMoving = false;
+            }, { passive: true });
 
-            elevContainer.addEventListener('touchend',    clearElevHoverSafe, { passive: true });
-            elevContainer.addEventListener('touchcancel', clearElevHoverSafe, { passive: true });
+            elevContainer.addEventListener('touchcancel', function() {
+                clearTimeout(elvTimer);
+                clearTimeout(hoverClearTimer);
+                if (window._clearElevHover) window._clearElevHover();
+                elvIsMoving = false;
+            }, { passive: true });
         }
 
         // Chiamato dopo initMap
