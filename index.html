@@ -135,7 +135,7 @@
         }
         
         #elevation-chart {
-            height: 320px;
+            /* height gestita da aspect-ratio */
         }
         
         .gradient-legend {
@@ -745,6 +745,17 @@
                 </div>
             </div>
         </div>
+        <div id="reset-bar" style="display:none;text-align:center;padding:8px 0 4px;">
+            <button id="reset-btn" onclick="resetApp()" style="
+                background:none;border:1px solid #d1d5db;color:#6b7280;
+                padding:5px 14px;border-radius:20px;font-size:0.75rem;
+                font-family:'Inter',sans-serif;cursor:pointer;
+                transition:all 0.2s;
+            " onmouseover="this.style.borderColor='#fc5200';this.style.color='#fc5200'"
+               onmouseout="this.style.borderColor='#d1d5db';this.style.color='#6b7280'">
+                ↩ Carica nuovo GPX
+            </button>
+        </div>
         <footer>
             <a href="https://linktr.ee/bonvicin.coaching" target="_blank">
                 &copy; 2026 Andrea Bonvicin &mdash; gpx-visualizer &mdash; Licenza MIT
@@ -994,6 +1005,8 @@ let map;
             
             uploadSection.style.display = 'none';
             dataContent.style.display = 'block';
+            const rb = document.getElementById('reset-bar');
+            if (rb) rb.style.display = 'block';
             
             setTimeout(() => {
                 initMap(gpxText);
@@ -1461,8 +1474,9 @@ let map;
                 .attr('viewBox', `0 0 ${totalW} ${totalH}`)
                 .attr('preserveAspectRatio', 'xMidYMid meet')
                 .style('width', '100%')
-                .style('height', '100%')
-                .style('display', 'block');
+                .style('height', 'auto')
+                .style('display', 'block')
+                .style('vertical-align', 'bottom');
 
             // Clip-path per non sforare
             svg.append('defs').append('clipPath').attr('id', 'elev-clip')
@@ -2462,6 +2476,25 @@ let map;
             }
         });
 
+
+        function resetApp() {
+            // Reset stato
+            routeData = null;
+            if (map) { map.remove(); map = null; }
+            svMiniMap = null; svMarker = null; svPolyline = null; svMainMarker = null;
+            window._elevXScale = null; window._elevYScale = null;
+            window._elevG = null; window._elevMargin = null;
+
+            // Reset UI
+            document.getElementById('data-content').style.display = 'none';
+            document.getElementById('upload-section').style.display = 'block';
+            document.getElementById('reset-bar').style.display = 'none';
+            document.getElementById('sv-panel').classList.remove('open');
+            document.getElementById('elevation-chart').innerHTML = '';
+            document.getElementById('climbs-section').style.display = 'none';
+            document.getElementById('climb-detail-chart').classList.remove('active');
+            document.getElementById('fileInput').value = '';
+        }
     </script>
 </body>
 </html>
