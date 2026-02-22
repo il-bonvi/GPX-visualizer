@@ -1097,24 +1097,8 @@ let map;
                         initSVPanel(); // wire up contextmenu + mobile touch
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
-            // Usa ResizeObserver: costruisce il grafico solo quando il container
-            // ha una larghezza reale (robusto su tutti i dispositivi/browser)
-            (function waitAndBuildChart() {
-                const elevEl = document.getElementById('elevation-chart');
-                const ro = new ResizeObserver((entries) => {
-                    for (const entry of entries) {
-                        const w = entry.contentRect.width;
-                        if (w > 50) {
-                            ro.disconnect();
-                            buildElevationChart();
-                            return;
-                        }
-                    }
-                });
-                ro.observe(elevEl);
-                // Fallback: se dopo 2s non ha ancora larghezza, forza
-                setTimeout(() => { ro.disconnect(); buildElevationChart(); }, 2000);
-            })();
+            // SVG ora usa viewBox: si scala automaticamente, chiamiamo subito
+            buildElevationChart();
             
             // Detect climbs
             setTimeout(() => detectAndDisplayClimbs(), 100);
@@ -1385,8 +1369,10 @@ let map;
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
-                const mx = touch.clientX - rect.left - window._elevMargin.left;
-                const maxX = rect.width - window._elevMargin.left - window._elevMargin.right;
+                // Converti pixel reali → spazio SVG virtuale (viewBox 900px)
+                const scaleX = 900 / rect.width;
+                const mx = (touch.clientX - rect.left) * scaleX - window._elevMargin.left;
+                const maxX = 900 - window._elevMargin.left - window._elevMargin.right;
                 if (mx >= 0 && mx <= maxX) {
                     window._updateElevHover(touch.clientX, touch.clientY, mx);
                 }
@@ -1432,11 +1418,9 @@ let map;
             if (_zoomStartMarker) { map.removeLayer(_zoomStartMarker); _zoomStartMarker = null; }
             if (_zoomEndMarker)   { map.removeLayer(_zoomEndMarker);   _zoomEndMarker = null; }
 
-            const totalW = Math.round(
-                container.getBoundingClientRect().width ||
-                container.clientWidth ||
-                window.innerWidth - 16
-            );
+            // SVG responsive: usa viewBox fisso, il browser scala automaticamente
+            // Questo risolve il problema di clientWidth=0 su mobile
+            const totalW = 900;
             const totalH = 290;
             const margin = { top: 20, right: 30, bottom: 35, left: 60 };
             const W = totalW - margin.left - margin.right;
@@ -1471,7 +1455,11 @@ let map;
                 .range([H, 0]);
 
             const svg = d3.select(container).append('svg')
-                .attr('width', totalW).attr('height', totalH);
+                .attr('viewBox', `0 0 ${totalW} ${totalH}`)
+                .attr('preserveAspectRatio', 'xMidYMid meet')
+                .style('width', '100%')
+                .style('height', 'auto')
+                .style('display', 'block');
 
             // Clip-path per non sforare
             svg.append('defs').append('clipPath').attr('id', 'elev-clip')
@@ -1738,12 +1726,13 @@ let map;
             const svgNode = svg.node();
             svgNode.removeEventListener('contextmenu', svgNode._svContextMenu || null);
             svgNode._svContextMenu = function(event) {
-                // Ignora completamente su touch/mobile
                 if (event.pointerType === 'touch') { event.preventDefault(); return; }
                 event.preventDefault();
                 event.stopPropagation();
                 const rect = svgNode.getBoundingClientRect();
-                const mx = event.clientX - rect.left - margin.left;
+                // Converti pixel reali → spazio SVG virtuale (viewBox 900px)
+                const scaleX = 900 / rect.width;
+                const mx = (event.clientX - rect.left) * scaleX - margin.left;
                 if (mx < 0 || mx > W) return;
                 const distKm = xScale.invert(mx);
                 const point = window._findNearestPointByDist && window._findNearestPointByDist(distKm);
