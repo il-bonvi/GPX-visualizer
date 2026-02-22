@@ -160,6 +160,10 @@
             height: 290px;
             position: relative;
             background: #ffffff;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: pan-y; /* permette scroll verticale, blocca zoom e long-press */
+            -webkit-touch-callout: none; /* blocca menu contestuale iOS */
         }
 
         #elevation-chart svg text {
@@ -1709,13 +1713,12 @@ let map;
             window._elevG = g;
             window._elevMargin = margin;
 
-            // ── Click destro sull'altimetria → apre pannello SV ──
-            // Usiamo addEventListener nativo sull'elemento SVG perché D3 Brush
-            // sovrascrive i listener D3 sul brushG con il suo overlay interno
+            // ── Click destro sull'altimetria → apre pannello SV (solo desktop) ──
             const svgNode = svg.node();
-            // Rimuovi listener precedente se buildElevationChart viene richiamata
             svgNode.removeEventListener('contextmenu', svgNode._svContextMenu || null);
             svgNode._svContextMenu = function(event) {
+                // Ignora completamente su touch/mobile
+                if (event.pointerType === 'touch') { event.preventDefault(); return; }
                 event.preventDefault();
                 event.stopPropagation();
                 const rect = svgNode.getBoundingClientRect();
@@ -1727,14 +1730,23 @@ let map;
             };
             svgNode.addEventListener('contextmenu', svgNode._svContextMenu);
 
-            // Hover — usa coordinate relative al gruppo g (brushG è figlio di g)
+            // Blocca il contextmenu nativo da long-press mobile sull'intero container
+            const elevContainer2 = document.getElementById('elevation-chart');
+            elevContainer2.removeEventListener('contextmenu', elevContainer2._blockCtx || null);
+            elevContainer2._blockCtx = function(e) { e.preventDefault(); };
+            elevContainer2.addEventListener('contextmenu', elevContainer2._blockCtx);
+
+            // Hover — solo mouse, non touch
             brushG.on('mousemove', function(event) {
                 if (isBrushing) return;
-                // d3.pointer con riferimento a g dà coordinate nello spazio di g
+                if (event.pointerType === 'touch') return; // ignora touch
                 const [mx] = d3.pointer(event, g.node());
                 updateHover(event.clientX, event.clientY, mx);
             })
-            .on('mouseleave', clearHover);
+            .on('mouseleave', function(event) {
+                if (event.pointerType === 'touch') return;
+                clearHover();
+            });
         }
 
         
