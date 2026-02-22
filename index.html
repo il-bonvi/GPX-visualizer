@@ -555,6 +555,46 @@
             width: 100%;
             height: 100px;
         }
+
+        /* ═══════════════════════════════
+           MOBILE RESPONSIVE
+        ═══════════════════════════════ */
+        @media (max-width: 768px) {
+            .container { padding: 0.3rem; }
+            .stats-row { grid-template-columns: repeat(3, 1fr); gap: 0.25rem; margin-bottom: 0.3rem; }
+            .stat-card { padding: 0.5rem 0.6rem; }
+            .stat-label { font-size: 0.65rem; margin-bottom: 0.2rem; }
+            .stat-value { font-size: 1.2rem; }
+            .stat-unit  { font-size: 0.75rem; }
+            #map { height: 55vw; min-height: 220px; max-height: 350px; }
+            #elevation-chart { height: 200px; }
+            .upload-section { padding: 1.5rem 1rem; }
+            .upload-zone { padding: 2rem 1rem; }
+            .gradient-legend { padding: 0.5rem 0.75rem; font-size: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
+            .climbs-list { grid-template-columns: 1fr; padding: 0.75rem; }
+            .climbs-header, .difficulty-legend { padding: 0.75rem; }
+            .climb-detail-header { flex-wrap: wrap; gap: 0.5rem; padding: 0.75rem; }
+            #climb-detail-svg { height: 160px; }
+            #app-layout { flex-direction: column; }
+            #sv-panel {
+                position: fixed !important;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important;
+                min-width: 0 !important;
+                height: 100dvh !important;
+                z-index: 9999;
+                transform: translateY(100%);
+                transition: transform 0.35s cubic-bezier(0.4,0,0.2,1) !important;
+                display: flex !important;
+            }
+            #sv-panel.open { transform: translateY(0); }
+            #sv-minimap { height: 200px; }
+            #sv-hint { font-size: 0.72rem; padding: 8px 12px; }
+            #mobile-sv-hint { display: block !important; }
+        }
+        @media (min-width: 769px) { #mobile-sv-hint { display: none !important; } }
+        #mobile-sv-hint { display: none; }
+
     </style>
 </head>
 <body>
@@ -602,6 +642,7 @@
             <div class="panel">
                 <div id="map"></div>
             </div>
+            <div id="mobile-sv-hint">👆 Tieni premuto sulla mappa o sul grafico per esplorare il punto in Street View</div>
             
             <div class="panel">
                 <div id="elevation-chart"></div>
@@ -709,7 +750,7 @@
         </div>
 
         <div id="sv-hint">
-            💡 <strong>Trascina il marker</strong> sulla mini-mappa per esplorare altri punti del percorso
+            💡 <strong>Trascina il marker</strong> sulla mini-mappa per esplorare altri punti del percorso<br><span style="font-size:0.7rem;opacity:0.8">Su mobile: tocca e trascina il marker</span>
         </div>
 
         <div id="sv-gradient-bar">
@@ -1283,11 +1324,100 @@ let map;
             document.getElementById('sv-close').addEventListener('click', () => {
                 document.getElementById('sv-panel').classList.remove('open');
                 setTimeout(() => { if (map) map.invalidateSize(); }, 380);
-                // Rimuovi marker dalla mappa principale
                 if (svMainMarker) { map.removeLayer(svMainMarker); svMainMarker = null; }
-                // Rimuovi marker dall'altimetria
                 if (window._elevG) window._elevG.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
             });
+
+            // ── MOBILE: Long-press su mappa → pannello SV ──
+            (function setupMobileTouch() {
+                const isMobile = () => window.matchMedia('(max-width: 768px)').matches || ('ontouchstart' in window);
+                
+                // ── Long-press sulla mappa Leaflet ──
+                let lpTimer = null;
+                let lpMoved = false;
+
+                map.getContainer().addEventListener('touchstart', function(e) {
+                    if (e.touches.length !== 1) return;
+                    lpMoved = false;
+                    const touch = e.touches[0];
+                    lpTimer = setTimeout(() => {
+                        if (lpMoved) return;
+                        // Converti coordinate touch → latlng Leaflet
+                        const rect = map.getContainer().getBoundingClientRect();
+                        const point = map.containerPointToLatLng([
+                            touch.clientX - rect.left,
+                            touch.clientY - rect.top
+                        ]);
+                        const nearest = findNearestPoint(point.lat, point.lng);
+                        if (nearest) {
+                            // Vibra se disponibile
+                            if (navigator.vibrate) navigator.vibrate(40);
+                            openSVPanel(nearest);
+                        }
+                    }, 600);
+                }, { passive: true });
+
+                map.getContainer().addEventListener('touchmove', function() {
+                    lpMoved = true;
+                    clearTimeout(lpTimer);
+                }, { passive: true });
+
+                map.getContainer().addEventListener('touchend', function() {
+                    clearTimeout(lpTimer);
+                }, { passive: true });
+
+                // ── Long-press sull'altimetria ──
+                const elevContainer = document.getElementById('elevation-chart');
+                let elvTimer = null;
+                let elvMoved = false;
+
+                elevContainer.addEventListener('touchstart', function(e) {
+                    if (e.touches.length !== 1) return;
+                    elvMoved = false;
+                    const touch = e.touches[0];
+                    elvTimer = setTimeout(() => {
+                        if (elvMoved) return;
+                        if (!window._elevXScale || !window._elevMargin) return;
+                        const rect = elevContainer.getBoundingClientRect();
+                        const mx = touch.clientX - rect.left - window._elevMargin.left;
+                        if (mx < 0) return;
+                        const distKm = window._elevXScale.invert(mx);
+                        const point = window._findNearestPointByDist && window._findNearestPointByDist(distKm);
+                        if (point) {
+                            if (navigator.vibrate) navigator.vibrate(40);
+                            window._openSVPanel && window._openSVPanel(point);
+                        }
+                    }, 600);
+                }, { passive: true });
+
+                elevContainer.addEventListener('touchmove', function() {
+                    elvMoved = true;
+                    clearTimeout(elvTimer);
+                }, { passive: true });
+
+                elevContainer.addEventListener('touchend', function() {
+                    clearTimeout(elvTimer);
+                }, { passive: true });
+
+                // ── Touch hover sull'altimetria (swipe per vedere quota/pendenza) ──
+                elevContainer.addEventListener('touchmove', function(e) {
+                    if (!window._elevXScale || !window._elevG || !window._elevMargin) return;
+                    if (e.touches.length !== 1) return;
+                    const touch = e.touches[0];
+                    const rect = elevContainer.getBoundingClientRect();
+                    const mx = touch.clientX - rect.left - window._elevMargin.left;
+                    if (mx < 0 || mx > (rect.width - window._elevMargin.left - window._elevMargin.right)) return;
+                    // Riusa updateHover se disponibile globalmente
+                    if (window._updateElevHover) {
+                        window._updateElevHover(touch.clientX, touch.clientY, mx);
+                    }
+                }, { passive: true });
+
+                elevContainer.addEventListener('touchend', function() {
+                    if (window._clearElevHover) window._clearElevHover();
+                }, { passive: true });
+
+            })();
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
             buildElevationChart();
@@ -1502,6 +1632,10 @@ let map;
                 tooltip.style.display = 'none';
                 if (_hoverMapMarker) _hoverMapMarker.setStyle({ opacity: 0, fillOpacity: 0 });
             }
+
+            // Esponi hover per touch mobile
+            window._updateElevHover = updateHover;
+            window._clearElevHover = clearHover;
 
             // ── Pannello statistiche selezione ──
             const selPanel = document.createElement('div');
