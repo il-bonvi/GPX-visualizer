@@ -162,8 +162,8 @@
             background: #ffffff;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: pan-y; /* permette scroll verticale, blocca zoom e long-press */
-            -webkit-touch-callout: none; /* blocca menu contestuale iOS */
+            touch-action: none; /* gestiamo tutto noi via JS */
+            -webkit-touch-callout: none;
         }
 
         #elevation-chart svg text {
@@ -1331,64 +1331,27 @@ let map;
             mapContainer.addEventListener('touchmove',  () => { lpMoved = true; clearTimeout(lpTimer); }, { passive: true });
             mapContainer.addEventListener('touchend',   () => clearTimeout(lpTimer), { passive: true });
 
-            // Long-press sull'altimetria
+            // Touch sull'altimetria: solo drag-hover, nessuna apertura SV
             const elevContainer = document.getElementById('elevation-chart');
-            let elvTimer = null;
-            let elvIsMoving = false;   // true solo se il dito si è mosso dopo touchstart
-            let hoverClearTimer = null;
-
-            elevContainer.addEventListener('touchstart', function(e) {
-                if (e.touches.length !== 1) return;
-                elvIsMoving = false;
-                clearTimeout(hoverClearTimer);
-                const touch = e.touches[0];
-
-                // Avvia timer long-press (600ms): se il dito resta fermo apre SV
-                elvTimer = setTimeout(() => {
-                    if (elvIsMoving) return; // si è mosso → non aprire
-                    if (!window._elevXScale || !window._elevMargin) return;
-                    const rect = elevContainer.getBoundingClientRect();
-                    const mx = touch.clientX - rect.left - window._elevMargin.left;
-                    if (mx < 0) return;
-                    const distKm = window._elevXScale.invert(mx);
-                    const point = findNearestPointByDist(distKm);
-                    if (point) {
-                        if (navigator.vibrate) navigator.vibrate(40);
-                        openSVPanel(point);
-                    }
-                }, 600);
-            }, { passive: true });
 
             elevContainer.addEventListener('touchmove', function(e) {
+                e.preventDefault(); // blocca scroll della pagina mentre si trascina
                 if (e.touches.length !== 1) return;
-                elvIsMoving = true;          // il dito si è mosso: annulla long-press
-                clearTimeout(elvTimer);
-                clearTimeout(hoverClearTimer);
-
-                // Hover mentre scorri (solo se il dito si muove)
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
                 const mx = touch.clientX - rect.left - window._elevMargin.left;
-                if (mx >= 0) window._updateElevHover(touch.clientX, touch.clientY, mx);
-            }, { passive: true });
+                if (mx >= 0 && mx <= rect.width - window._elevMargin.left - window._elevMargin.right) {
+                    window._updateElevHover(touch.clientX, touch.clientY, mx);
+                }
+            }, { passive: false });
 
             elevContainer.addEventListener('touchend', function() {
-                clearTimeout(elvTimer);
-                // Se l'utente non si è mai mosso (tap secco) → nascondi subito
-                // Se si è mosso (swipe) → breve delay per leggere il valore
-                const delay = elvIsMoving ? 400 : 0;
-                hoverClearTimer = setTimeout(() => {
-                    if (window._clearElevHover) window._clearElevHover();
-                }, delay);
-                elvIsMoving = false;
+                if (window._clearElevHover) window._clearElevHover();
             }, { passive: true });
 
             elevContainer.addEventListener('touchcancel', function() {
-                clearTimeout(elvTimer);
-                clearTimeout(hoverClearTimer);
                 if (window._clearElevHover) window._clearElevHover();
-                elvIsMoving = false;
             }, { passive: true });
         }
 
@@ -1730,11 +1693,7 @@ let map;
             };
             svgNode.addEventListener('contextmenu', svgNode._svContextMenu);
 
-            // Blocca il contextmenu nativo da long-press mobile sull'intero container
-            const elevContainer2 = document.getElementById('elevation-chart');
-            elevContainer2.removeEventListener('contextmenu', elevContainer2._blockCtx || null);
-            elevContainer2._blockCtx = function(e) { e.preventDefault(); };
-            elevContainer2.addEventListener('contextmenu', elevContainer2._blockCtx);
+
 
             // Hover — solo mouse, non touch
             brushG.on('mousemove', function(event) {
