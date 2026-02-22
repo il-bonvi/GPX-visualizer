@@ -574,7 +574,7 @@
             .stat-label { font-size: 0.65rem; margin-bottom: 0.2rem; }
             .stat-value { font-size: 1.2rem; }
             .stat-unit  { font-size: 0.75rem; }
-            #map { height: 55vw; min-height: 220px; max-height: 350px; }
+            #map { height: 65vw; min-height: 260px; max-height: 420px; }
             #elevation-chart { height: 200px; }
             .upload-section { padding: 1.5rem 1rem; }
             .upload-zone { padding: 2rem 1rem; }
@@ -1097,7 +1097,8 @@ let map;
                         initSVPanel(); // wire up contextmenu + mobile touch
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
-            buildElevationChart();
+            // Su mobile il layout non è ancora pronto: aspetta due frame di paint
+            requestAnimationFrame(() => requestAnimationFrame(() => buildElevationChart()));
             
             // Detect climbs
             setTimeout(() => detectAndDisplayClimbs(), 100);
@@ -1415,7 +1416,16 @@ let map;
             if (_zoomStartMarker) { map.removeLayer(_zoomStartMarker); _zoomStartMarker = null; }
             if (_zoomEndMarker)   { map.removeLayer(_zoomEndMarker);   _zoomEndMarker = null; }
 
-            const totalW = container.clientWidth || 900;
+            const totalW = Math.round(
+                container.getBoundingClientRect().width ||
+                container.clientWidth ||
+                window.innerWidth - 16
+            );
+            if (totalW < 50) {
+                // Container ancora non visibile: riprova al prossimo frame
+                requestAnimationFrame(() => buildElevationChart(zoomDomain));
+                return;
+            }
             const totalH = 290;
             const margin = { top: 20, right: 30, bottom: 35, left: 60 };
             const W = totalW - margin.left - margin.right;
