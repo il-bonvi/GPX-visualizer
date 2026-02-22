@@ -1331,28 +1331,38 @@ let map;
             mapContainer.addEventListener('touchmove',  () => { lpMoved = true; clearTimeout(lpTimer); }, { passive: true });
             mapContainer.addEventListener('touchend',   () => clearTimeout(lpTimer), { passive: true });
 
-            // Touch sull'altimetria: solo drag-hover, nessuna apertura SV
+            // Touch sull'altimetria: drag per hover, sparisce al touchend
             const elevContainer = document.getElementById('elevation-chart');
 
-            elevContainer.addEventListener('touchmove', function(e) {
-                e.preventDefault(); // blocca scroll della pagina mentre si trascina
+            // Usa named functions per poter fare removeEventListener corretto
+            function onElevTouchMove(e) {
                 if (e.touches.length !== 1) return;
+                e.preventDefault();
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
                 const mx = touch.clientX - rect.left - window._elevMargin.left;
-                if (mx >= 0 && mx <= rect.width - window._elevMargin.left - window._elevMargin.right) {
+                const maxX = rect.width - window._elevMargin.left - window._elevMargin.right;
+                if (mx >= 0 && mx <= maxX) {
                     window._updateElevHover(touch.clientX, touch.clientY, mx);
                 }
-            }, { passive: false });
-
-            elevContainer.addEventListener('touchend', function() {
+            }
+            function onElevTouchEnd() {
                 if (window._clearElevHover) window._clearElevHover();
-            }, { passive: true });
+            }
 
-            elevContainer.addEventListener('touchcancel', function() {
-                if (window._clearElevHover) window._clearElevHover();
-            }, { passive: true });
+            // Rimuovi eventuali listener precedenti prima di aggiungerne di nuovi
+            if (elevContainer._onElevTouchMove) {
+                elevContainer.removeEventListener('touchmove', elevContainer._onElevTouchMove);
+                elevContainer.removeEventListener('touchend', elevContainer._onElevTouchEnd);
+                elevContainer.removeEventListener('touchcancel', elevContainer._onElevTouchEnd);
+            }
+            elevContainer._onElevTouchMove = onElevTouchMove;
+            elevContainer._onElevTouchEnd  = onElevTouchEnd;
+
+            elevContainer.addEventListener('touchmove',   onElevTouchMove, { passive: false });
+            elevContainer.addEventListener('touchend',    onElevTouchEnd,  { passive: true });
+            elevContainer.addEventListener('touchcancel', onElevTouchEnd,  { passive: true });
         }
 
         // Chiamato dopo initMap
@@ -1695,17 +1705,22 @@ let map;
 
 
 
-            // Hover — solo mouse, non touch
+            // Hover — solo mouse, mai touch
             brushG.on('mousemove', function(event) {
                 if (isBrushing) return;
-                if (event.pointerType === 'touch') return; // ignora touch
+                // Blocca qualsiasi evento touch simulato come mouse
+                if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
+                if (event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents) return;
                 const [mx] = d3.pointer(event, g.node());
                 updateHover(event.clientX, event.clientY, mx);
             })
             .on('mouseleave', function(event) {
-                if (event.pointerType === 'touch') return;
+                if (event.pointerType === 'touch' || event.pointerType === 'pen') return;
                 clearHover();
             });
+
+            // Blocca contextmenu da long-press mobile sull'SVG
+            svgNode.addEventListener('contextmenu', function(e) { e.preventDefault(); }, { once: false });
         }
 
         
