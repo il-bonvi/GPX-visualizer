@@ -1063,361 +1063,7 @@ let map;
                 .addTo(map)
                 .bindPopup(`<b>🏁 Arrivo</b><br>Quota: ${Math.round(endPt.ele)} m<br>Distanza totale: ${routeData.distance.toFixed(2)} km`);
             
-            // ── Street View Side Panel ──
-            let svMiniMap = null;
-            let svMarker = null;
-            let svPolyline = null;
-            let svMainMarker = null;   // marker sulla mappa principale
-            let svElevLine = null;     // linea verticale sull'altimetria
-            let svElevDot = null;      // punto sull'altimetria
-            // Riferimenti alle scale del grafico altimetrico (aggiornati da buildElevationChart)
-            window._elevXScale = null;
-            window._elevYScale = null;
-            window._elevG = null;
-            window._elevMargin = null;
-
-            function findNearestPoint(lat, lng) {
-                let nearest = null;
-                let minDist = Infinity;
-                routeData.points.forEach(p => {
-                    const d = (p.lat - lat) ** 2 + (p.lon - lng) ** 2;
-                    if (d < minDist) { minDist = d; nearest = p; }
-                });
-                return nearest;
-            }
-
-            function findNearestPointByDist(distKm) {
-                let nearest = null;
-                let minDiff = Infinity;
-                routeData.points.forEach(p => {
-                    const diff = Math.abs(p.dist / 1000 - distKm);
-                    if (diff < minDiff) { minDiff = diff; nearest = p; }
-                });
-                return nearest;
-            }
-            window._findNearestPointByDist = findNearestPointByDist;
-
-            // Icona marker principale mappa
-            const svMainIcon = L.divIcon({
-                className: '',
-                html: `<div style="width:16px;height:16px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(252,82,0,0.6);"></div>`,
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
-
-            function updateSVPanel(point) {
-                const lat = point.lat.toFixed(6);
-                const lng = point.lon.toFixed(6);
-                const distKm = (point.dist / 1000).toFixed(2);
-                const ele = Math.round(point.ele);
-                const grade = point.gradient ? point.gradient.toFixed(1) + '%' : '0%';
-
-                document.getElementById('sv-coords').textContent = `${lat}, ${lng}`;
-                document.getElementById('sv-km').textContent = distKm + ' km';
-                document.getElementById('sv-ele').textContent = ele + ' m';
-                document.getElementById('sv-grade').textContent = grade;
-
-                const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
-                document.getElementById('sv-open-btn').href = svUrl;
-
-                // ── 1. Marker sulla mini-mappa del pannello ──
-                if (svMiniMap && svMarker) {
-                    svMarker.setLatLng([point.lat, point.lon]);
-                    svMiniMap.panTo([point.lat, point.lon], { animate: true, duration: 0.4 });
-                }
-
-                // ── 2. Marker sulla mappa principale ──
-                if (!svMainMarker) {
-                    svMainMarker = L.marker([point.lat, point.lon], { icon: svMainIcon, zIndexOffset: 500 }).addTo(map);
-                } else {
-                    svMainMarker.setLatLng([point.lat, point.lon]);
-                }
-
-                // ── 3. Marker sull'altimetria ──
-                if (window._elevXScale && window._elevYScale && window._elevG) {
-                    const xS = window._elevXScale;
-                    const yS = window._elevYScale;
-                    const g = window._elevG;
-                    const cx = xS(point.dist / 1000);
-                    const cy = yS(point.ele);
-                    const H = window._elevMargin ? (290 - window._elevMargin.top - window._elevMargin.bottom) : 235;
-
-                    // Rimuovi vecchi elementi SV
-                    g.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
-
-                    g.append('line').attr('class', 'sv-elev-line')
-                        .attr('x1', cx).attr('x2', cx)
-                        .attr('y1', 0).attr('y2', H)
-                        .attr('stroke', '#fc5200').attr('stroke-width', 2)
-                        .attr('stroke-dasharray', '4,3').attr('opacity', 0.9);
-
-                    g.append('circle').attr('class', 'sv-elev-dot')
-                        .attr('cx', cx).attr('cy', cy).attr('r', 6)
-                        .attr('fill', '#fc5200').attr('stroke', 'white').attr('stroke-width', 2);
-
-                    g.append('text').attr('class', 'sv-elev-label')
-                        .attr('x', cx + 8).attr('y', cy - 8)
-                        .attr('font-size', '11px').attr('font-weight', 'bold')
-                        .attr('fill', '#fc5200')
-                        .text(Math.round(point.ele) + ' m');
-                }
-
-                // Mini grafico altimetrico zona ±2km
-                drawSVGradientChart(point);
-            }
-
-            function drawSVGradientChart(centerPoint) {
-                const centerDist = centerPoint.dist / 1000;
-                const range = 2; // ±2km
-                const pts = routeData.points.filter(p => {
-                    const d = p.dist / 1000;
-                    return d >= centerDist - range && d <= centerDist + range;
-                });
-                if (pts.length < 2) return;
-
-                const svg = document.getElementById('sv-gradient-chart');
-                const W = svg.parentElement.clientWidth - 32;
-                const H = 100;
-                svg.setAttribute('width', W);
-                svg.setAttribute('height', H);
-                svg.innerHTML = '';
-
-                const margin = { top: 8, right: 8, bottom: 20, left: 36 };
-                const cW = W - margin.left - margin.right;
-                const cH = H - margin.top - margin.bottom;
-
-                const dists = pts.map(p => p.dist / 1000);
-                const eles = pts.map(p => p.ele);
-                const minD = Math.min(...dists), maxD = Math.max(...dists);
-                const minE = Math.min(...eles), maxE = Math.max(...eles);
-                const padE = (maxE - minE) * 0.15 || 5;
-
-                const xS = v => margin.left + ((v - minD) / (maxD - minD || 1)) * cW;
-                const yS = v => margin.top + cH - ((v - (minE - padE)) / ((maxE + padE) - (minE - padE))) * cH;
-
-                const ns = 'http://www.w3.org/2000/svg';
-
-                // Area fill
-                const areaPoints = [`${xS(dists[0])},${margin.top + cH}`];
-                pts.forEach((p, i) => areaPoints.push(`${xS(dists[i])},${yS(p.ele)}`));
-                areaPoints.push(`${xS(dists[dists.length-1])},${margin.top + cH}`);
-
-                const area = document.createElementNS(ns, 'polygon');
-                area.setAttribute('points', areaPoints.join(' '));
-                area.setAttribute('fill', '#fc5200');
-                area.setAttribute('opacity', '0.15');
-                svg.appendChild(area);
-
-                // Line
-                const linePoints = pts.map((p, i) => `${xS(dists[i])},${yS(p.ele)}`).join(' ');
-                const polyline = document.createElementNS(ns, 'polyline');
-                polyline.setAttribute('points', linePoints);
-                polyline.setAttribute('fill', 'none');
-                polyline.setAttribute('stroke', '#fc5200');
-                polyline.setAttribute('stroke-width', '2');
-                svg.appendChild(polyline);
-
-                // Marker del punto corrente
-                const cx = xS(centerDist);
-                const cy = yS(centerPoint.ele);
-                const circle = document.createElementNS(ns, 'circle');
-                circle.setAttribute('cx', cx);
-                circle.setAttribute('cy', cy);
-                circle.setAttribute('r', 5);
-                circle.setAttribute('fill', '#fc5200');
-                circle.setAttribute('stroke', 'white');
-                circle.setAttribute('stroke-width', 2);
-                svg.appendChild(circle);
-
-                // Linea verticale marker
-                const line = document.createElementNS(ns, 'line');
-                line.setAttribute('x1', cx); line.setAttribute('y1', margin.top);
-                line.setAttribute('x2', cx); line.setAttribute('y2', margin.top + cH);
-                line.setAttribute('stroke', '#fc5200');
-                line.setAttribute('stroke-width', 1);
-                line.setAttribute('stroke-dasharray', '3,3');
-                svg.appendChild(line);
-
-                // Label quota punto
-                const text = document.createElementNS(ns, 'text');
-                text.setAttribute('x', Math.min(cx + 6, W - 40));
-                text.setAttribute('y', cy - 6);
-                text.setAttribute('font-size', '10');
-                text.setAttribute('fill', '#fc5200');
-                text.setAttribute('font-weight', 'bold');
-                text.textContent = Math.round(centerPoint.ele) + ' m';
-                svg.appendChild(text);
-
-                // Asse Y min/max
-                [{ v: minE, label: Math.round(minE) + ' m' }, { v: maxE, label: Math.round(maxE) + ' m' }].forEach(tick => {
-                    const t = document.createElementNS(ns, 'text');
-                    t.setAttribute('x', margin.left - 4);
-                    t.setAttribute('y', yS(tick.v) + 4);
-                    t.setAttribute('font-size', '9');
-                    t.setAttribute('fill', '#9ca3af');
-                    t.setAttribute('text-anchor', 'end');
-                    t.textContent = tick.label;
-                    svg.appendChild(t);
-                });
-            }
-
-            function openSVPanel(nearestPoint) {
-                window._openSVPanel = openSVPanel;
-                const panel = document.getElementById('sv-panel');
-                panel.classList.add('open');
-                // Ridisegna la mappa dopo la transizione
-                setTimeout(() => { if (map) map.invalidateSize(); }, 380);
-
-                // Init mini-mappa solo la prima volta
-                if (!svMiniMap) {
-                    svMiniMap = L.map('sv-minimap', { zoomControl: true, attributionControl: false });
-
-                    // Layer satellite (Esri)
-                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-                        maxZoom: 19
-                    }).addTo(svMiniMap);
-
-                    // Traccia GPX sulla mini-mappa
-                    const latlngs = routeData.points.map(p => [p.lat, p.lon]);
-                    svPolyline = L.polyline(latlngs, { color: '#fc5200', weight: 3, opacity: 0.9 }).addTo(svMiniMap);
-
-                    // Marker trascinabile
-                    const dragIcon = L.divIcon({
-                        className: '',
-                        html: `<div style="width:18px;height:18px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:grab;"></div>`,
-                        iconSize: [18, 18],
-                        iconAnchor: [9, 9]
-                    });
-                    svMarker = L.marker([nearestPoint.lat, nearestPoint.lon], {
-                        icon: dragIcon,
-                        draggable: true
-                    }).addTo(svMiniMap);
-
-                    // Aggiorna pannello mentre trascini
-                    svMarker.on('drag', function(e) {
-                        const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
-                        svMarker.setLatLng([p.lat, p.lon]);
-                        updateSVPanel(p);
-                    });
-                    svMarker.on('dragend', function() {
-                        const ll = svMarker.getLatLng();
-                        const p = findNearestPoint(ll.lat, ll.lng);
-                        svMarker.setLatLng([p.lat, p.lon]);
-                        updateSVPanel(p);
-                    });
-
-                    setTimeout(() => svMiniMap.invalidateSize(), 100);
-                }
-
-                // Posiziona marker e centra
-                svMarker.setLatLng([nearestPoint.lat, nearestPoint.lon]);
-                svMiniMap.setView([nearestPoint.lat, nearestPoint.lon], 16);
-
-                updateSVPanel(nearestPoint);
-            }
-
-            map.on('contextmenu', function(e) {
-                const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
-                openSVPanel(p);
-            });
-
-            document.getElementById('sv-close').addEventListener('click', () => {
-                document.getElementById('sv-panel').classList.remove('open');
-                setTimeout(() => { if (map) map.invalidateSize(); }, 380);
-                if (svMainMarker) { map.removeLayer(svMainMarker); svMainMarker = null; }
-                if (window._elevG) window._elevG.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
-            });
-
-            // ── MOBILE: Long-press su mappa → pannello SV ──
-            (function setupMobileTouch() {
-                const isMobile = () => window.matchMedia('(max-width: 768px)').matches || ('ontouchstart' in window);
-                
-                // ── Long-press sulla mappa Leaflet ──
-                let lpTimer = null;
-                let lpMoved = false;
-
-                map.getContainer().addEventListener('touchstart', function(e) {
-                    if (e.touches.length !== 1) return;
-                    lpMoved = false;
-                    const touch = e.touches[0];
-                    lpTimer = setTimeout(() => {
-                        if (lpMoved) return;
-                        // Converti coordinate touch → latlng Leaflet
-                        const rect = map.getContainer().getBoundingClientRect();
-                        const point = map.containerPointToLatLng([
-                            touch.clientX - rect.left,
-                            touch.clientY - rect.top
-                        ]);
-                        const nearest = findNearestPoint(point.lat, point.lng);
-                        if (nearest) {
-                            // Vibra se disponibile
-                            if (navigator.vibrate) navigator.vibrate(40);
-                            openSVPanel(nearest);
-                        }
-                    }, 600);
-                }, { passive: true });
-
-                map.getContainer().addEventListener('touchmove', function() {
-                    lpMoved = true;
-                    clearTimeout(lpTimer);
-                }, { passive: true });
-
-                map.getContainer().addEventListener('touchend', function() {
-                    clearTimeout(lpTimer);
-                }, { passive: true });
-
-                // ── Long-press sull'altimetria ──
-                const elevContainer = document.getElementById('elevation-chart');
-                let elvTimer = null;
-                let elvMoved = false;
-
-                elevContainer.addEventListener('touchstart', function(e) {
-                    if (e.touches.length !== 1) return;
-                    elvMoved = false;
-                    const touch = e.touches[0];
-                    elvTimer = setTimeout(() => {
-                        if (elvMoved) return;
-                        if (!window._elevXScale || !window._elevMargin) return;
-                        const rect = elevContainer.getBoundingClientRect();
-                        const mx = touch.clientX - rect.left - window._elevMargin.left;
-                        if (mx < 0) return;
-                        const distKm = window._elevXScale.invert(mx);
-                        const point = window._findNearestPointByDist && window._findNearestPointByDist(distKm);
-                        if (point) {
-                            if (navigator.vibrate) navigator.vibrate(40);
-                            window._openSVPanel && window._openSVPanel(point);
-                        }
-                    }, 600);
-                }, { passive: true });
-
-                elevContainer.addEventListener('touchmove', function() {
-                    elvMoved = true;
-                    clearTimeout(elvTimer);
-                }, { passive: true });
-
-                elevContainer.addEventListener('touchend', function() {
-                    clearTimeout(elvTimer);
-                }, { passive: true });
-
-                // ── Touch hover sull'altimetria (swipe per vedere quota/pendenza) ──
-                elevContainer.addEventListener('touchmove', function(e) {
-                    if (!window._elevXScale || !window._elevG || !window._elevMargin) return;
-                    if (e.touches.length !== 1) return;
-                    const touch = e.touches[0];
-                    const rect = elevContainer.getBoundingClientRect();
-                    const mx = touch.clientX - rect.left - window._elevMargin.left;
-                    if (mx < 0 || mx > (rect.width - window._elevMargin.left - window._elevMargin.right)) return;
-                    // Riusa updateHover se disponibile globalmente
-                    if (window._updateElevHover) {
-                        window._updateElevHover(touch.clientX, touch.clientY, mx);
-                    }
-                }, { passive: true });
-
-                elevContainer.addEventListener('touchend', function() {
-                    if (window._clearElevHover) window._clearElevHover();
-                }, { passive: true });
-
-            })();
+                        initSVPanel(); // wire up contextmenu + mobile touch
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
             buildElevationChart();
@@ -1426,7 +1072,311 @@ let map;
             setTimeout(() => detectAndDisplayClimbs(), 100);
         }
 
-        function buildElevationChart(zoomDomain) {
+// ═══════════════════════════════════════════════════
+        // GLOBAL SV PANEL STATE & FUNCTIONS
+        // ═══════════════════════════════════════════════════
+        let svMiniMap = null;
+        let svMarker = null;
+        let svPolyline = null;
+        let svMainMarker = null;
+
+        const svMainIcon = L.divIcon({
+            className: '',
+            html: `<div style="width:16px;height:16px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(252,82,0,0.6);"></div>`,
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+        });
+
+        window._elevXScale = null;
+        window._elevYScale = null;
+        window._elevG = null;
+        window._elevMargin = null;
+
+        function findNearestPoint(lat, lng) {
+            if (!routeData) return null;
+            let nearest = null;
+            let minDist = Infinity;
+            routeData.points.forEach(p => {
+                const d = (p.lat - lat) ** 2 + (p.lon - lng) ** 2;
+                if (d < minDist) { minDist = d; nearest = p; }
+            });
+            return nearest;
+        }
+
+        function findNearestPointByDist(distKm) {
+            if (!routeData) return null;
+            let nearest = null;
+            let minDiff = Infinity;
+            routeData.points.forEach(p => {
+                const diff = Math.abs(p.dist / 1000 - distKm);
+                if (diff < minDiff) { minDiff = diff; nearest = p; }
+            });
+            return nearest;
+        }
+        window._findNearestPointByDist = findNearestPointByDist;
+
+        function drawSVGradientChart(centerPoint) {
+            if (!routeData) return;
+            const centerDist = centerPoint.dist / 1000;
+            const range = 2;
+            const pts = routeData.points.filter(p => {
+                const d = p.dist / 1000;
+                return d >= centerDist - range && d <= centerDist + range;
+            });
+            if (pts.length < 2) return;
+
+            const svg = document.getElementById('sv-gradient-chart');
+            const W = svg.parentElement.clientWidth - 32;
+            const H = 100;
+            svg.setAttribute('width', W);
+            svg.setAttribute('height', H);
+            svg.innerHTML = '';
+
+            const margin = { top: 8, right: 8, bottom: 20, left: 36 };
+            const cW = W - margin.left - margin.right;
+            const cH = H - margin.top - margin.bottom;
+
+            const dists = pts.map(p => p.dist / 1000);
+            const eles = pts.map(p => p.ele);
+            const minD = Math.min(...dists), maxD = Math.max(...dists);
+            const minE = Math.min(...eles), maxE = Math.max(...eles);
+            const padE = (maxE - minE) * 0.15 || 5;
+
+            const xS = v => margin.left + ((v - minD) / (maxD - minD || 1)) * cW;
+            const yS = v => margin.top + cH - ((v - (minE - padE)) / ((maxE + padE) - (minE - padE))) * cH;
+
+            const ns = 'http://www.w3.org/2000/svg';
+
+            const areaPoints = [`${xS(dists[0])},${margin.top + cH}`];
+            pts.forEach((p, i) => areaPoints.push(`${xS(dists[i])},${yS(p.ele)}`));
+            areaPoints.push(`${xS(dists[dists.length-1])},${margin.top + cH}`);
+
+            const area = document.createElementNS(ns, 'polygon');
+            area.setAttribute('points', areaPoints.join(' '));
+            area.setAttribute('fill', '#fc5200');
+            area.setAttribute('opacity', '0.15');
+            svg.appendChild(area);
+
+            const linePoints = pts.map((p, i) => `${xS(dists[i])},${yS(p.ele)}`).join(' ');
+            const polyline = document.createElementNS(ns, 'polyline');
+            polyline.setAttribute('points', linePoints);
+            polyline.setAttribute('fill', 'none');
+            polyline.setAttribute('stroke', '#fc5200');
+            polyline.setAttribute('stroke-width', '2');
+            svg.appendChild(polyline);
+
+            const cx = xS(centerDist);
+            const cy = yS(centerPoint.ele);
+            const circle = document.createElementNS(ns, 'circle');
+            circle.setAttribute('cx', cx); circle.setAttribute('cy', cy);
+            circle.setAttribute('r', 5); circle.setAttribute('fill', '#fc5200');
+            circle.setAttribute('stroke', 'white'); circle.setAttribute('stroke-width', 2);
+            svg.appendChild(circle);
+
+            const line = document.createElementNS(ns, 'line');
+            line.setAttribute('x1', cx); line.setAttribute('y1', margin.top);
+            line.setAttribute('x2', cx); line.setAttribute('y2', margin.top + cH);
+            line.setAttribute('stroke', '#fc5200'); line.setAttribute('stroke-width', 1);
+            line.setAttribute('stroke-dasharray', '3,3');
+            svg.appendChild(line);
+
+            const text = document.createElementNS(ns, 'text');
+            text.setAttribute('x', Math.min(cx + 6, W - 40));
+            text.setAttribute('y', cy - 6);
+            text.setAttribute('font-size', '10'); text.setAttribute('fill', '#fc5200');
+            text.setAttribute('font-weight', 'bold');
+            text.textContent = Math.round(centerPoint.ele) + ' m';
+            svg.appendChild(text);
+
+            [{ v: minE, label: Math.round(minE) + ' m' }, { v: maxE, label: Math.round(maxE) + ' m' }].forEach(tick => {
+                const t = document.createElementNS(ns, 'text');
+                t.setAttribute('x', margin.left - 4); t.setAttribute('y', yS(tick.v) + 4);
+                t.setAttribute('font-size', '9'); t.setAttribute('fill', '#9ca3af');
+                t.setAttribute('text-anchor', 'end'); t.textContent = tick.label;
+                svg.appendChild(t);
+            });
+        }
+
+        function updateSVPanel(point) {
+            const lat = point.lat.toFixed(6);
+            const lng = point.lon.toFixed(6);
+            const distKm = (point.dist / 1000).toFixed(2);
+            const ele = Math.round(point.ele);
+            const grade = point.gradient ? point.gradient.toFixed(1) + '%' : '0%';
+
+            document.getElementById('sv-coords').textContent = `${lat}, ${lng}`;
+            document.getElementById('sv-km').textContent = distKm + ' km';
+            document.getElementById('sv-ele').textContent = ele + ' m';
+            document.getElementById('sv-grade').textContent = grade;
+
+            const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+            document.getElementById('sv-open-btn').href = svUrl;
+
+            if (svMiniMap && svMarker) {
+                svMarker.setLatLng([point.lat, point.lon]);
+                svMiniMap.panTo([point.lat, point.lon], { animate: true, duration: 0.4 });
+            }
+
+            if (!svMainMarker) {
+                svMainMarker = L.marker([point.lat, point.lon], { icon: svMainIcon, zIndexOffset: 500 }).addTo(map);
+            } else {
+                svMainMarker.setLatLng([point.lat, point.lon]);
+            }
+
+            if (window._elevXScale && window._elevYScale && window._elevG) {
+                const xS = window._elevXScale;
+                const yS = window._elevYScale;
+                const g = window._elevG;
+                const cx = xS(point.dist / 1000);
+                const cy = yS(point.ele);
+                const H = window._elevMargin ? (290 - window._elevMargin.top - window._elevMargin.bottom) : 235;
+                g.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
+                g.append('line').attr('class', 'sv-elev-line')
+                    .attr('x1', cx).attr('x2', cx).attr('y1', 0).attr('y2', H)
+                    .attr('stroke', '#fc5200').attr('stroke-width', 2)
+                    .attr('stroke-dasharray', '4,3').attr('opacity', 0.9);
+                g.append('circle').attr('class', 'sv-elev-dot')
+                    .attr('cx', cx).attr('cy', cy).attr('r', 6)
+                    .attr('fill', '#fc5200').attr('stroke', 'white').attr('stroke-width', 2);
+                g.append('text').attr('class', 'sv-elev-label')
+                    .attr('x', cx + 8).attr('y', cy - 8)
+                    .attr('font-size', '11px').attr('font-weight', 'bold')
+                    .attr('fill', '#fc5200')
+                    .text(Math.round(point.ele) + ' m');
+            }
+
+            drawSVGradientChart(point);
+        }
+
+        function openSVPanel(nearestPoint) {
+            const panel = document.getElementById('sv-panel');
+            panel.classList.add('open');
+            setTimeout(() => { if (map) map.invalidateSize(); }, 380);
+
+            if (!svMiniMap) {
+                svMiniMap = L.map('sv-minimap', { zoomControl: true, attributionControl: false });
+                L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                    maxZoom: 19
+                }).addTo(svMiniMap);
+
+                const latlngs = routeData.points.map(p => [p.lat, p.lon]);
+                svPolyline = L.polyline(latlngs, { color: '#fc5200', weight: 3, opacity: 0.9 }).addTo(svMiniMap);
+
+                const dragIcon = L.divIcon({
+                    className: '',
+                    html: `<div style="width:18px;height:18px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:grab;"></div>`,
+                    iconSize: [18, 18], iconAnchor: [9, 9]
+                });
+                svMarker = L.marker([nearestPoint.lat, nearestPoint.lon], {
+                    icon: dragIcon, draggable: true
+                }).addTo(svMiniMap);
+
+                svMarker.on('drag', function(e) {
+                    const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
+                    svMarker.setLatLng([p.lat, p.lon]);
+                    updateSVPanel(p);
+                });
+                svMarker.on('dragend', function() {
+                    const ll = svMarker.getLatLng();
+                    const p = findNearestPoint(ll.lat, ll.lng);
+                    svMarker.setLatLng([p.lat, p.lon]);
+                    updateSVPanel(p);
+                });
+
+                setTimeout(() => svMiniMap.invalidateSize(), 100);
+            }
+
+            svMarker.setLatLng([nearestPoint.lat, nearestPoint.lon]);
+            svMiniMap.setView([nearestPoint.lat, nearestPoint.lon], 16);
+            updateSVPanel(nearestPoint);
+        }
+        window._openSVPanel = openSVPanel;
+
+        // ── sv-close button ──
+        document.getElementById('sv-close').addEventListener('click', () => {
+            document.getElementById('sv-panel').classList.remove('open');
+            setTimeout(() => { if (map) map.invalidateSize(); }, 380);
+            if (svMainMarker) { map.removeLayer(svMainMarker); svMainMarker = null; }
+            if (window._elevG) window._elevG.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
+        });
+
+        // ── Touch: long-press su mappa e altimetria ──
+        function setupMobileTouch() {
+            // Long-press sulla mappa
+            let lpTimer = null, lpMoved = false;
+            const mapContainer = document.getElementById('map');
+
+            mapContainer.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                lpMoved = false;
+                const touch = e.touches[0];
+                lpTimer = setTimeout(() => {
+                    if (lpMoved) return;
+                    const rect = mapContainer.getBoundingClientRect();
+                    const latlng = map.containerPointToLatLng([
+                        touch.clientX - rect.left,
+                        touch.clientY - rect.top
+                    ]);
+                    const nearest = findNearestPoint(latlng.lat, latlng.lng);
+                    if (nearest) {
+                        if (navigator.vibrate) navigator.vibrate(40);
+                        openSVPanel(nearest);
+                    }
+                }, 600);
+            }, { passive: true });
+            mapContainer.addEventListener('touchmove',  () => { lpMoved = true; clearTimeout(lpTimer); }, { passive: true });
+            mapContainer.addEventListener('touchend',   () => clearTimeout(lpTimer), { passive: true });
+
+            // Long-press sull'altimetria
+            let elvTimer = null, elvMoved = false;
+            const elevContainer = document.getElementById('elevation-chart');
+
+            elevContainer.addEventListener('touchstart', function(e) {
+                if (e.touches.length !== 1) return;
+                elvMoved = false;
+                const touch = e.touches[0];
+                elvTimer = setTimeout(() => {
+                    if (elvMoved) return;
+                    if (!window._elevXScale || !window._elevMargin) return;
+                    const rect = elevContainer.getBoundingClientRect();
+                    const mx = touch.clientX - rect.left - window._elevMargin.left;
+                    if (mx < 0) return;
+                    const distKm = window._elevXScale.invert(mx);
+                    const point = findNearestPointByDist(distKm);
+                    if (point) {
+                        if (navigator.vibrate) navigator.vibrate(40);
+                        openSVPanel(point);
+                    }
+                }, 600);
+            }, { passive: true });
+            elevContainer.addEventListener('touchmove', function(e) {
+                elvMoved = true;
+                clearTimeout(elvTimer);
+                // Touch-hover: mostra quota mentre scorri
+                if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
+                const touch = e.touches[0];
+                const rect = elevContainer.getBoundingClientRect();
+                const mx = touch.clientX - rect.left - window._elevMargin.left;
+                if (mx >= 0) window._updateElevHover(touch.clientX, touch.clientY, mx);
+            }, { passive: true });
+            elevContainer.addEventListener('touchend', () => {
+                clearTimeout(elvTimer);
+                if (window._clearElevHover) window._clearElevHover();
+            }, { passive: true });
+        }
+
+        // Chiamato dopo initMap
+        function initSVPanel() {
+            // Contextmenu (desktop right-click) sulla mappa principale
+            map.on('contextmenu', function(e) {
+                const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
+                if (p) openSVPanel(p);
+            });
+            setupMobileTouch();
+        }
+
+
+              function buildElevationChart(zoomDomain) {
             const pts = routeData.points;
             if (!pts || pts.length < 2) return;
 
