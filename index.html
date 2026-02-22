@@ -1349,9 +1349,12 @@ let map;
                     }
                 }, 600);
             }, { passive: true });
+            let hoverClearTimer = null;
+
             elevContainer.addEventListener('touchmove', function(e) {
                 elvMoved = true;
                 clearTimeout(elvTimer);
+                clearTimeout(hoverClearTimer);
                 // Touch-hover: mostra quota mentre scorri
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
@@ -1359,10 +1362,18 @@ let map;
                 const mx = touch.clientX - rect.left - window._elevMargin.left;
                 if (mx >= 0) window._updateElevHover(touch.clientX, touch.clientY, mx);
             }, { passive: true });
-            elevContainer.addEventListener('touchend', () => {
+
+            function clearElevHoverSafe() {
+                clearTimeout(hoverClearTimer);
                 clearTimeout(elvTimer);
-                if (window._clearElevHover) window._clearElevHover();
-            }, { passive: true });
+                // Piccolo delay così l'utente vede l'ultimo valore prima che sparisca
+                hoverClearTimer = setTimeout(() => {
+                    if (window._clearElevHover) window._clearElevHover();
+                }, 300);
+            }
+
+            elevContainer.addEventListener('touchend',    clearElevHoverSafe, { passive: true });
+            elevContainer.addEventListener('touchcancel', clearElevHoverSafe, { passive: true });
         }
 
         // Chiamato dopo initMap
