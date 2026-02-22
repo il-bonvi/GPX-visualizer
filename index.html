@@ -1097,8 +1097,24 @@ let map;
                         initSVPanel(); // wire up contextmenu + mobile touch
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
-            // Su mobile il layout non è ancora pronto: aspetta due frame di paint
-            requestAnimationFrame(() => requestAnimationFrame(() => buildElevationChart()));
+            // Usa ResizeObserver: costruisce il grafico solo quando il container
+            // ha una larghezza reale (robusto su tutti i dispositivi/browser)
+            (function waitAndBuildChart() {
+                const elevEl = document.getElementById('elevation-chart');
+                const ro = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        const w = entry.contentRect.width;
+                        if (w > 50) {
+                            ro.disconnect();
+                            buildElevationChart();
+                            return;
+                        }
+                    }
+                });
+                ro.observe(elevEl);
+                // Fallback: se dopo 2s non ha ancora larghezza, forza
+                setTimeout(() => { ro.disconnect(); buildElevationChart(); }, 2000);
+            })();
             
             // Detect climbs
             setTimeout(() => detectAndDisplayClimbs(), 100);
@@ -1421,11 +1437,6 @@ let map;
                 container.clientWidth ||
                 window.innerWidth - 16
             );
-            if (totalW < 50) {
-                // Container ancora non visibile: riprova al prossimo frame
-                requestAnimationFrame(() => buildElevationChart(zoomDomain));
-                return;
-            }
             const totalH = 290;
             const margin = { top: 20, right: 30, bottom: 35, left: 60 };
             const W = totalW - margin.left - margin.right;
