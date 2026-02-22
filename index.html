@@ -170,6 +170,8 @@
             -webkit-user-select: none;
             touch-action: none;
             -webkit-touch-callout: none;
+            /* aspect-ratio: forza altezza proporzionale alla larghezza, no spazio vuoto */
+            aspect-ratio: 900 / 290;
         }
 
         #elevation-chart svg text {
@@ -1450,16 +1452,16 @@ let map;
 
             const minEle = d3.min(data, d => d.ele);
             const maxEle = d3.max(data, d => d.ele);
-            const pad = (maxEle - minEle) * 0.08 || 5;
+            const padTop = (maxEle - minEle) * 0.12 || 5;
             const yScale = d3.scaleLinear()
-                .domain([minEle - pad, maxEle + pad])
+                .domain([minEle, maxEle + padTop])
                 .range([H, 0]);
 
             const svg = d3.select(container).append('svg')
                 .attr('viewBox', `0 0 ${totalW} ${totalH}`)
                 .attr('preserveAspectRatio', 'xMidYMid meet')
                 .style('width', '100%')
-                .style('height', 'auto')
+                .style('height', '100%')
                 .style('display', 'block');
 
             // Clip-path per non sforare
