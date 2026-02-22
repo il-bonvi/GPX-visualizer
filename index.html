@@ -1505,9 +1505,15 @@ let map;
             }
 
             // ── Tooltip e hover ──
-            const tooltip = document.createElement('div');
-            tooltip.style.cssText = 'position:fixed;pointer-events:none;display:none;background:rgba(15,15,15,0.92);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;font-family:Inter,sans-serif;z-index:99999;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.35);border-left:3px solid #fc5200;';
-            document.body.appendChild(tooltip);
+            // Riusa tooltip esistente se già nel DOM (evita duplicati su rebuild)
+            let tooltip = document.getElementById('elev-hover-tooltip');
+            if (!tooltip) {
+                tooltip = document.createElement('div');
+                tooltip.id = 'elev-hover-tooltip';
+                tooltip.style.cssText = 'position:fixed;pointer-events:none;display:none;background:rgba(15,15,15,0.92);color:#fff;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500;font-family:Inter,sans-serif;z-index:99999;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,0.35);border-left:3px solid #fc5200;';
+                document.body.appendChild(tooltip);
+            }
+            tooltip.style.display = 'none'; // nascondi sempre al rebuild
 
             const hoverLine = g.append('line')
                 .attr('y1', 0).attr('y2', H)
