@@ -161,13 +161,16 @@
         }
         
         #elevation-chart {
-            height: 290px;
             position: relative;
             background: #ffffff;
             user-select: none;
             -webkit-user-select: none;
-            touch-action: none; /* gestiamo tutto noi via JS */
+            touch-action: none;
             -webkit-touch-callout: none;
+            min-height: 120px;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
 
         #elevation-chart svg text {
@@ -574,8 +577,8 @@
             .stat-label { font-size: 0.65rem; margin-bottom: 0.2rem; }
             .stat-value { font-size: 1.2rem; }
             .stat-unit  { font-size: 0.75rem; }
-            #map { height: 65vw; min-height: 260px; max-height: 420px; }
-            #elevation-chart { height: 200px; }
+            #map { height: 55vw; min-height: 220px; max-height: 350px; }
+            /* elevation-chart: altezza auto via viewBox, nessuna height fissa */
             .upload-section { padding: 1.5rem 1rem; }
             .upload-zone { padding: 2rem 1rem; }
             .gradient-legend { padding: 0.5rem 0.75rem; font-size: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
@@ -611,6 +614,9 @@
             margin-top: 8px;
             font-size: 0.8rem;
             font-family: 'Inter', sans-serif;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
         }
         footer a {
             color: #9ca3af;
@@ -1097,7 +1103,6 @@ let map;
                         initSVPanel(); // wire up contextmenu + mobile touch
 
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
-            // SVG ora usa viewBox: si scala automaticamente, chiamiamo subito
             buildElevationChart();
             
             // Detect climbs
@@ -1369,8 +1374,8 @@ let map;
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
-                // Converti pixel reali → spazio SVG virtuale (viewBox 900px)
-                const scaleX = 900 / rect.width;
+                // scala pixel reali → spazio SVG virtuale (viewBox 900px)
+                const scaleX = 900 / (rect.width || 900);
                 const mx = (touch.clientX - rect.left) * scaleX - window._elevMargin.left;
                 const maxX = 900 - window._elevMargin.left - window._elevMargin.right;
                 if (mx >= 0 && mx <= maxX) {
@@ -1418,11 +1423,11 @@ let map;
             if (_zoomStartMarker) { map.removeLayer(_zoomStartMarker); _zoomStartMarker = null; }
             if (_zoomEndMarker)   { map.removeLayer(_zoomEndMarker);   _zoomEndMarker = null; }
 
-            // SVG responsive: usa viewBox fisso, il browser scala automaticamente
-            // Questo risolve il problema di clientWidth=0 su mobile
+            // viewBox fisso: D3 lavora in coordinate virtuali 900x290
+            // il browser scala l'SVG al 100% del container — clientWidth non serve
             const totalW = 900;
             const totalH = 290;
-            const margin = { top: 20, right: 30, bottom: 35, left: 60 };
+            const margin = { top: 20, right: 30, bottom: 50, left: 60 };
             const W = totalW - margin.left - margin.right;
             const H = totalH - margin.top - margin.bottom;
 
@@ -1726,12 +1731,12 @@ let map;
             const svgNode = svg.node();
             svgNode.removeEventListener('contextmenu', svgNode._svContextMenu || null);
             svgNode._svContextMenu = function(event) {
+                // Ignora completamente su touch/mobile
                 if (event.pointerType === 'touch') { event.preventDefault(); return; }
                 event.preventDefault();
                 event.stopPropagation();
                 const rect = svgNode.getBoundingClientRect();
-                // Converti pixel reali → spazio SVG virtuale (viewBox 900px)
-                const scaleX = 900 / rect.width;
+                const scaleX = 900 / (rect.width || 900);
                 const mx = (event.clientX - rect.left) * scaleX - margin.left;
                 if (mx < 0 || mx > W) return;
                 const distKm = xScale.invert(mx);
@@ -2006,8 +2011,8 @@ let map;
                         const maxEle = Math.max(...allEles);
                         const pad = (maxEle - minEle) * 0.08;
 
-                        const svgW = svg.node().clientWidth || 900;
-                        const margin = { top: 20, right: 30, bottom: 35, left: 60 };
+                        const svgW = 900; // viewBox fisso, stesso spazio coordinato del grafico principale
+                        const margin = { top: 20, right: 30, bottom: 50, left: 60 };
                         const W = svgW - margin.left - margin.right;
                         const H = 290 - margin.top - margin.bottom;
 
