@@ -1053,6 +1053,7 @@ let map;
         
         function initMap(gpxText) {
             map = L.map('map');
+            L.control.scale({ imperial: false, position: 'bottomleft' }).addTo(map);
             
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© OpenStreetMap'
@@ -2024,46 +2025,44 @@ let map;
                     endMarker.bindPopup(`<strong>Fine Salita ${index + 1}</strong><br>Quota: ${endPoint.ele.toFixed(0)} m`);
                     climbPolylines.push(endMarker);
                     
-                    // Add markers on elevation chart using our D3 chart scales
+                    // Add markers on elevation chart using the current (possibly zoomed) scales
                     setTimeout(() => {
                         const svg = d3.select('#elevation-chart svg');
                         if (!svg.node()) return;
                         const chartGroup = svg.select('g');
                         if (!chartGroup.node()) return;
 
+                        // Usa le scale globali aggiornate da buildElevationChart (zoom-aware)
+                        const xS = window._elevXScale;
+                        const yS = window._elevYScale;
+                        if (!xS || !yS) return;
+
                         const pts = routeData.points;
-                        const totalDist = pts[pts.length-1].dist / 1000;
-                        const allEles = pts.map(p => p.ele);
-                        const minEle = Math.min(...allEles);
-                        const maxEle = Math.max(...allEles);
-                        const pad = (maxEle - minEle) * 0.08;
-
-                        const svgW = 900; // stesso spazio viewBox del grafico principale
-                        const margin = { top: 20, right: 30, bottom: 50, left: 60 };
-                        const W = svgW - margin.left - margin.right;
-                        const H = 290 - margin.top - margin.bottom;
-
-                        const xS = d3.scaleLinear().domain([0, totalDist]).range([0, W]);
-                        const yS = d3.scaleLinear().domain([minEle - pad, maxEle + pad]).range([H, 0]);
-
                         const startPt = pts[climb.startIndex];
                         const endPt   = pts[climb.endIndex];
 
-                        chartGroup.append('circle')
-                            .attr('class', 'climb-elevation-marker')
-                            .attr('cx', xS(startPt.dist / 1000))
-                            .attr('cy', yS(startPt.ele))
-                            .attr('r', 7).attr('fill', startColor)
-                            .attr('stroke', '#fff').attr('stroke-width', 2)
-                            .style('pointer-events', 'none');
+                        const [d0, d1] = xS.domain();
 
-                        chartGroup.append('circle')
-                            .attr('class', 'climb-elevation-marker')
-                            .attr('cx', xS(endPt.dist / 1000))
-                            .attr('cy', yS(endPt.ele))
-                            .attr('r', 7).attr('fill', endColor)
-                            .attr('stroke', '#fff').attr('stroke-width', 2)
-                            .style('pointer-events', 'none');
+                        // Disegna solo se il punto è nel dominio visibile
+                        if (startPt.dist / 1000 >= d0 && startPt.dist / 1000 <= d1) {
+                            chartGroup.append('circle')
+                                .attr('class', 'climb-elevation-marker')
+                                .attr('cx', xS(startPt.dist / 1000))
+                                .attr('cy', yS(startPt.ele))
+                                .attr('r', 7).attr('fill', startColor)
+                                .attr('stroke', '#fff').attr('stroke-width', 2)
+                                .style('pointer-events', 'none');
+                        }
+
+                        if (endPt.dist / 1000 >= d0 && endPt.dist / 1000 <= d1) {
+                            chartGroup.append('circle')
+                                .attr('class', 'climb-elevation-marker')
+                                .attr('cx', xS(endPt.dist / 1000))
+                                .attr('cy', yS(endPt.ele))
+                                .attr('r', 7).attr('fill', endColor)
+                                .attr('stroke', '#fff').attr('stroke-width', 2)
+                                .style('pointer-events', 'none');
+                        }
                     }, 100);
                 });
                 
