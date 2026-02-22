@@ -24,6 +24,7 @@
             font-family: 'Inter', sans-serif;
             background: #f8f9fa;
             color: #1a1a1a;
+            overflow-x: hidden;
         }
         
         .container {
@@ -406,14 +407,161 @@
             height: 220px;
             display: block;
         }
+
+        /* ── Layout wrapper per push ── */
+        #app-layout {
+            display: flex;
+            transition: none;
+            width: 100%;
+        }
+        #main-content {
+            flex: 1;
+            min-width: 0;
+            transition: all 0.35s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        /* ── Street View Side Panel ── */
+        #sv-panel {
+            display: none;
+            width: 0;
+            min-width: 0;
+            overflow: hidden;
+            flex-shrink: 0;
+            transition: width 0.35s cubic-bezier(0.4,0,0.2,1);
+            background: white;
+            box-shadow: -4px 0 24px rgba(0,0,0,0.18);
+            flex-direction: column;
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            position: sticky;
+            top: 0;
+        }
+        #sv-panel.open {
+            display: flex;
+            width: 420px;
+            min-width: 420px;
+        }
+
+        #sv-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            background: #1a1a1a;
+            color: white;
+            flex-shrink: 0;
+        }
+        #sv-panel-header h3 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        #sv-close {
+            background: none;
+            border: none;
+            color: #9ca3af;
+            font-size: 1.4rem;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0 4px;
+            transition: color 0.2s;
+        }
+        #sv-close:hover { color: white; }
+
+        #sv-minimap {
+            width: 100%;
+            height: 260px;
+            flex-shrink: 0;
+        }
+
+        #sv-info {
+            padding: 16px;
+            border-bottom: 1px solid #e5e7eb;
+            flex-shrink: 0;
+        }
+        #sv-coords {
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-bottom: 10px;
+            font-family: monospace;
+        }
+        #sv-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 14px;
+        }
+        .sv-stat {
+            background: #f9fafb;
+            border-radius: 6px;
+            padding: 8px 10px;
+            text-align: center;
+        }
+        .sv-stat-label {
+            font-size: 0.65rem;
+            color: #6b7280;
+            text-transform: uppercase;
+            font-weight: 500;
+            margin-bottom: 2px;
+        }
+        .sv-stat-value {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        #sv-open-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 12px;
+            background: #fc5200;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        #sv-open-btn:hover { background: #e04800; }
+
+        #sv-hint {
+            padding: 12px 16px;
+            background: #fff7ed;
+            border-top: 1px solid #fed7aa;
+            font-size: 0.78rem;
+            color: #92400e;
+            flex-shrink: 0;
+        }
+
+        #sv-gradient-bar {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+        .sv-gradient-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 10px;
+        }
+        #sv-gradient-chart {
+            width: 100%;
+            height: 100px;
+        }
     </style>
 </head>
 <body>
+    <!-- Layout wrapper: contenuto principale + pannello SV affiancati -->
+    <div id="app-layout">
+    <div id="main-content">
     <div class="container">
-        <header>
-            <h1>Route Analysis</h1>
-        </header>
-        
         <div id="upload-section" class="upload-section">
             <div class="upload-zone" id="uploadZone">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📁</div>
@@ -523,7 +671,53 @@
                 </div>
             </div>
         </div>
-    </div>
+    </div><!-- /container -->
+    </div><!-- /main-content -->
+
+    <!-- Street View Side Panel (dentro app-layout, affiancato) -->
+    <div id="sv-panel">
+        <div id="sv-panel-header">
+            <h3>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#fc5200"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                Esplora Punto
+            </h3>
+            <button id="sv-close">×</button>
+        </div>
+
+        <div id="sv-minimap"></div>
+
+        <div id="sv-info">
+            <div id="sv-coords">--</div>
+            <div id="sv-stats">
+                <div class="sv-stat">
+                    <div class="sv-stat-label">Km percorso</div>
+                    <div class="sv-stat-value" id="sv-km">--</div>
+                </div>
+                <div class="sv-stat">
+                    <div class="sv-stat-label">Quota</div>
+                    <div class="sv-stat-value" id="sv-ele">--</div>
+                </div>
+                <div class="sv-stat">
+                    <div class="sv-stat-label">Pendenza</div>
+                    <div class="sv-stat-value" id="sv-grade">--</div>
+                </div>
+            </div>
+            <a id="sv-open-btn" href="#" target="_blank" rel="noopener">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                Apri in Google Street View
+            </a>
+        </div>
+
+        <div id="sv-hint">
+            💡 <strong>Trascina il marker</strong> sulla mini-mappa per esplorare altri punti del percorso
+        </div>
+
+        <div id="sv-gradient-bar">
+            <div class="sv-gradient-title">Profilo altimetrico zona</div>
+            <svg id="sv-gradient-chart"></svg>
+        </div>
+    </div><!-- /sv-panel -->
+    </div><!-- /app-layout -->
 
     <script>
 let map;
@@ -828,6 +1022,273 @@ let map;
                 .addTo(map)
                 .bindPopup(`<b>🏁 Arrivo</b><br>Quota: ${Math.round(endPt.ele)} m<br>Distanza totale: ${routeData.distance.toFixed(2)} km`);
             
+            // ── Street View Side Panel ──
+            let svMiniMap = null;
+            let svMarker = null;
+            let svPolyline = null;
+            let svMainMarker = null;   // marker sulla mappa principale
+            let svElevLine = null;     // linea verticale sull'altimetria
+            let svElevDot = null;      // punto sull'altimetria
+            // Riferimenti alle scale del grafico altimetrico (aggiornati da buildElevationChart)
+            window._elevXScale = null;
+            window._elevYScale = null;
+            window._elevG = null;
+            window._elevMargin = null;
+
+            function findNearestPoint(lat, lng) {
+                let nearest = null;
+                let minDist = Infinity;
+                routeData.points.forEach(p => {
+                    const d = (p.lat - lat) ** 2 + (p.lon - lng) ** 2;
+                    if (d < minDist) { minDist = d; nearest = p; }
+                });
+                return nearest;
+            }
+
+            function findNearestPointByDist(distKm) {
+                let nearest = null;
+                let minDiff = Infinity;
+                routeData.points.forEach(p => {
+                    const diff = Math.abs(p.dist / 1000 - distKm);
+                    if (diff < minDiff) { minDiff = diff; nearest = p; }
+                });
+                return nearest;
+            }
+            window._findNearestPointByDist = findNearestPointByDist;
+
+            // Icona marker principale mappa
+            const svMainIcon = L.divIcon({
+                className: '',
+                html: `<div style="width:16px;height:16px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(252,82,0,0.6);"></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+
+            function updateSVPanel(point) {
+                const lat = point.lat.toFixed(6);
+                const lng = point.lon.toFixed(6);
+                const distKm = (point.dist / 1000).toFixed(2);
+                const ele = Math.round(point.ele);
+                const grade = point.gradient ? point.gradient.toFixed(1) + '%' : '0%';
+
+                document.getElementById('sv-coords').textContent = `${lat}, ${lng}`;
+                document.getElementById('sv-km').textContent = distKm + ' km';
+                document.getElementById('sv-ele').textContent = ele + ' m';
+                document.getElementById('sv-grade').textContent = grade;
+
+                const svUrl = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${lat},${lng}`;
+                document.getElementById('sv-open-btn').href = svUrl;
+
+                // ── 1. Marker sulla mini-mappa del pannello ──
+                if (svMiniMap && svMarker) {
+                    svMarker.setLatLng([point.lat, point.lon]);
+                    svMiniMap.panTo([point.lat, point.lon], { animate: true, duration: 0.4 });
+                }
+
+                // ── 2. Marker sulla mappa principale ──
+                if (!svMainMarker) {
+                    svMainMarker = L.marker([point.lat, point.lon], { icon: svMainIcon, zIndexOffset: 500 }).addTo(map);
+                } else {
+                    svMainMarker.setLatLng([point.lat, point.lon]);
+                }
+
+                // ── 3. Marker sull'altimetria ──
+                if (window._elevXScale && window._elevYScale && window._elevG) {
+                    const xS = window._elevXScale;
+                    const yS = window._elevYScale;
+                    const g = window._elevG;
+                    const cx = xS(point.dist / 1000);
+                    const cy = yS(point.ele);
+                    const H = window._elevMargin ? (290 - window._elevMargin.top - window._elevMargin.bottom) : 235;
+
+                    // Rimuovi vecchi elementi SV
+                    g.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
+
+                    g.append('line').attr('class', 'sv-elev-line')
+                        .attr('x1', cx).attr('x2', cx)
+                        .attr('y1', 0).attr('y2', H)
+                        .attr('stroke', '#fc5200').attr('stroke-width', 2)
+                        .attr('stroke-dasharray', '4,3').attr('opacity', 0.9);
+
+                    g.append('circle').attr('class', 'sv-elev-dot')
+                        .attr('cx', cx).attr('cy', cy).attr('r', 6)
+                        .attr('fill', '#fc5200').attr('stroke', 'white').attr('stroke-width', 2);
+
+                    g.append('text').attr('class', 'sv-elev-label')
+                        .attr('x', cx + 8).attr('y', cy - 8)
+                        .attr('font-size', '11px').attr('font-weight', 'bold')
+                        .attr('fill', '#fc5200')
+                        .text(Math.round(point.ele) + ' m');
+                }
+
+                // Mini grafico altimetrico zona ±2km
+                drawSVGradientChart(point);
+            }
+
+            function drawSVGradientChart(centerPoint) {
+                const centerDist = centerPoint.dist / 1000;
+                const range = 2; // ±2km
+                const pts = routeData.points.filter(p => {
+                    const d = p.dist / 1000;
+                    return d >= centerDist - range && d <= centerDist + range;
+                });
+                if (pts.length < 2) return;
+
+                const svg = document.getElementById('sv-gradient-chart');
+                const W = svg.parentElement.clientWidth - 32;
+                const H = 100;
+                svg.setAttribute('width', W);
+                svg.setAttribute('height', H);
+                svg.innerHTML = '';
+
+                const margin = { top: 8, right: 8, bottom: 20, left: 36 };
+                const cW = W - margin.left - margin.right;
+                const cH = H - margin.top - margin.bottom;
+
+                const dists = pts.map(p => p.dist / 1000);
+                const eles = pts.map(p => p.ele);
+                const minD = Math.min(...dists), maxD = Math.max(...dists);
+                const minE = Math.min(...eles), maxE = Math.max(...eles);
+                const padE = (maxE - minE) * 0.15 || 5;
+
+                const xS = v => margin.left + ((v - minD) / (maxD - minD || 1)) * cW;
+                const yS = v => margin.top + cH - ((v - (minE - padE)) / ((maxE + padE) - (minE - padE))) * cH;
+
+                const ns = 'http://www.w3.org/2000/svg';
+
+                // Area fill
+                const areaPoints = [`${xS(dists[0])},${margin.top + cH}`];
+                pts.forEach((p, i) => areaPoints.push(`${xS(dists[i])},${yS(p.ele)}`));
+                areaPoints.push(`${xS(dists[dists.length-1])},${margin.top + cH}`);
+
+                const area = document.createElementNS(ns, 'polygon');
+                area.setAttribute('points', areaPoints.join(' '));
+                area.setAttribute('fill', '#fc5200');
+                area.setAttribute('opacity', '0.15');
+                svg.appendChild(area);
+
+                // Line
+                const linePoints = pts.map((p, i) => `${xS(dists[i])},${yS(p.ele)}`).join(' ');
+                const polyline = document.createElementNS(ns, 'polyline');
+                polyline.setAttribute('points', linePoints);
+                polyline.setAttribute('fill', 'none');
+                polyline.setAttribute('stroke', '#fc5200');
+                polyline.setAttribute('stroke-width', '2');
+                svg.appendChild(polyline);
+
+                // Marker del punto corrente
+                const cx = xS(centerDist);
+                const cy = yS(centerPoint.ele);
+                const circle = document.createElementNS(ns, 'circle');
+                circle.setAttribute('cx', cx);
+                circle.setAttribute('cy', cy);
+                circle.setAttribute('r', 5);
+                circle.setAttribute('fill', '#fc5200');
+                circle.setAttribute('stroke', 'white');
+                circle.setAttribute('stroke-width', 2);
+                svg.appendChild(circle);
+
+                // Linea verticale marker
+                const line = document.createElementNS(ns, 'line');
+                line.setAttribute('x1', cx); line.setAttribute('y1', margin.top);
+                line.setAttribute('x2', cx); line.setAttribute('y2', margin.top + cH);
+                line.setAttribute('stroke', '#fc5200');
+                line.setAttribute('stroke-width', 1);
+                line.setAttribute('stroke-dasharray', '3,3');
+                svg.appendChild(line);
+
+                // Label quota punto
+                const text = document.createElementNS(ns, 'text');
+                text.setAttribute('x', Math.min(cx + 6, W - 40));
+                text.setAttribute('y', cy - 6);
+                text.setAttribute('font-size', '10');
+                text.setAttribute('fill', '#fc5200');
+                text.setAttribute('font-weight', 'bold');
+                text.textContent = Math.round(centerPoint.ele) + ' m';
+                svg.appendChild(text);
+
+                // Asse Y min/max
+                [{ v: minE, label: Math.round(minE) + ' m' }, { v: maxE, label: Math.round(maxE) + ' m' }].forEach(tick => {
+                    const t = document.createElementNS(ns, 'text');
+                    t.setAttribute('x', margin.left - 4);
+                    t.setAttribute('y', yS(tick.v) + 4);
+                    t.setAttribute('font-size', '9');
+                    t.setAttribute('fill', '#9ca3af');
+                    t.setAttribute('text-anchor', 'end');
+                    t.textContent = tick.label;
+                    svg.appendChild(t);
+                });
+            }
+
+            function openSVPanel(nearestPoint) {
+                window._openSVPanel = openSVPanel;
+                const panel = document.getElementById('sv-panel');
+                panel.classList.add('open');
+                // Ridisegna la mappa dopo la transizione
+                setTimeout(() => { if (map) map.invalidateSize(); }, 380);
+
+                // Init mini-mappa solo la prima volta
+                if (!svMiniMap) {
+                    svMiniMap = L.map('sv-minimap', { zoomControl: true, attributionControl: false });
+
+                    // Layer satellite (Esri)
+                    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                        maxZoom: 19
+                    }).addTo(svMiniMap);
+
+                    // Traccia GPX sulla mini-mappa
+                    const latlngs = routeData.points.map(p => [p.lat, p.lon]);
+                    svPolyline = L.polyline(latlngs, { color: '#fc5200', weight: 3, opacity: 0.9 }).addTo(svMiniMap);
+
+                    // Marker trascinabile
+                    const dragIcon = L.divIcon({
+                        className: '',
+                        html: `<div style="width:18px;height:18px;background:#fc5200;border:3px solid white;border-radius:50%;box-shadow:0 2px 8px rgba(0,0,0,0.4);cursor:grab;"></div>`,
+                        iconSize: [18, 18],
+                        iconAnchor: [9, 9]
+                    });
+                    svMarker = L.marker([nearestPoint.lat, nearestPoint.lon], {
+                        icon: dragIcon,
+                        draggable: true
+                    }).addTo(svMiniMap);
+
+                    // Aggiorna pannello mentre trascini
+                    svMarker.on('drag', function(e) {
+                        const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
+                        svMarker.setLatLng([p.lat, p.lon]);
+                        updateSVPanel(p);
+                    });
+                    svMarker.on('dragend', function() {
+                        const ll = svMarker.getLatLng();
+                        const p = findNearestPoint(ll.lat, ll.lng);
+                        svMarker.setLatLng([p.lat, p.lon]);
+                        updateSVPanel(p);
+                    });
+
+                    setTimeout(() => svMiniMap.invalidateSize(), 100);
+                }
+
+                // Posiziona marker e centra
+                svMarker.setLatLng([nearestPoint.lat, nearestPoint.lon]);
+                svMiniMap.setView([nearestPoint.lat, nearestPoint.lon], 16);
+
+                updateSVPanel(nearestPoint);
+            }
+
+            map.on('contextmenu', function(e) {
+                const p = findNearestPoint(e.latlng.lat, e.latlng.lng);
+                openSVPanel(p);
+            });
+
+            document.getElementById('sv-close').addEventListener('click', () => {
+                document.getElementById('sv-panel').classList.remove('open');
+                setTimeout(() => { if (map) map.invalidateSize(); }, 380);
+                // Rimuovi marker dalla mappa principale
+                if (svMainMarker) { map.removeLayer(svMainMarker); svMainMarker = null; }
+                // Rimuovi marker dall'altimetria
+                if (window._elevG) window._elevG.selectAll('.sv-elev-line, .sv-elev-dot, .sv-elev-label').remove();
+            });
+
             // ── Chart altimetrico D3 puro (no leaflet-elevation) ──
             buildElevationChart();
             
@@ -1128,6 +1589,30 @@ let map;
             brushG.on('dblclick', function() {
                 buildElevationChart(null);
             });
+
+            // ── Esponi scale per il marker SV ──
+            window._elevXScale = xScale;
+            window._elevYScale = yScale;
+            window._elevG = g;
+            window._elevMargin = margin;
+
+            // ── Click destro sull'altimetria → apre pannello SV ──
+            // Usiamo addEventListener nativo sull'elemento SVG perché D3 Brush
+            // sovrascrive i listener D3 sul brushG con il suo overlay interno
+            const svgNode = svg.node();
+            // Rimuovi listener precedente se buildElevationChart viene richiamata
+            svgNode.removeEventListener('contextmenu', svgNode._svContextMenu || null);
+            svgNode._svContextMenu = function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                const rect = svgNode.getBoundingClientRect();
+                const mx = event.clientX - rect.left - margin.left;
+                if (mx < 0 || mx > W) return;
+                const distKm = xScale.invert(mx);
+                const point = window._findNearestPointByDist && window._findNearestPointByDist(distKm);
+                if (point && window._openSVPanel) window._openSVPanel(point);
+            };
+            svgNode.addEventListener('contextmenu', svgNode._svContextMenu);
 
             // Hover — usa coordinate relative al gruppo g (brushG è figlio di g)
             brushG.on('mousemove', function(event) {
