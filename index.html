@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Route Analysis</title>
+    <title>Bonvi gpx-Visualizer</title>
     
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -599,6 +599,24 @@
         @media (min-width: 769px) { #mobile-sv-hint { display: none !important; } }
         #mobile-sv-hint { display: none; }
 
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: #9ca3af;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            font-family: 'Inter', sans-serif;
+        }
+        footer a {
+            color: #9ca3af;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        footer a:hover {
+            color: #fc5200;
+        }
     </style>
 </head>
 <body>
@@ -646,7 +664,7 @@
             <div class="panel">
                 <div id="map"></div>
             </div>
-            <div id="mobile-sv-hint">👆 Tieni premuto sulla mappa o sul grafico per esplorare il punto in Street View</div>
+            <div id="mobile-sv-hint">👆 Tieni premuto sulla mappa</div>
             
             <div class="panel">
                 <div id="elevation-chart"></div>
@@ -716,6 +734,11 @@
                 </div>
             </div>
         </div>
+        <footer>
+            <a href="https://linktr.ee/bonvicin.coaching" target="_blank">
+                &copy; 2026 Andrea Bonvicin &mdash; gpx-analyzer &mdash; Licenza MIT
+            </a>
+        </footer>
     </div><!-- /container -->
     </div><!-- /main-content -->
 
