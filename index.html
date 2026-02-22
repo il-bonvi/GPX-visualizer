@@ -606,6 +606,22 @@
         #mobile-sv-hint { display: none; }
 
 
+        .sv-hint {
+            display: none;
+            text-align: center;
+            font-size: 0.82rem;
+            color: #2c3e57;
+            background: #f3f4f6;
+            border-left: 3px solid #fc5200;
+            padding: 8px 16px;
+            margin: 8px 16px 4px;
+            border-radius: 4px;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.5;
+        }
+        @media (min-width: 769px) {
+            .sv-hint { display: block; }
+        }
         footer {
             text-align: center;
             padding: 20px;
@@ -679,7 +695,7 @@
                 <div id="elevation-chart"></div>
                 <div class="gradient-legend">
                     <div id="selection-stats" style="display:flex;gap:2rem;align-items:center;width:100%;font-size:0.85rem;">
-                        <span style="color:#6b7280;font-size:0.8rem;" id="sel-label">Trascina sul grafico per selezionare una sezione.</span>
+                        <span style="color:#6b7280;font-size:0.8rem;" id="sel-label">Trascina sul grafico per selezionare una sezione</span>
                         <span id="sel-dist" style="display:none">📏 <strong id="sel-dist-val">--</strong></span>
                         <span id="sel-gain" style="display:none">↑ <strong id="sel-gain-val" style="color:#16a34a">--</strong></span>
                         <span id="sel-loss" style="display:none">↓ <strong id="sel-loss-val" style="color:#2563eb">--</strong></span>
@@ -754,6 +770,7 @@
                 ↩ Carica nuovo GPX
             </button>
         </div>
+        <p class="sv-hint">👆 Premi il tasto destro sulla mappa o sull'altimetria per esplorare il punto in Street View. Attenzione, l'orientamento potrebbe essere errato.</p>
         <footer>
             <a href="https://linktr.ee/bonvicin.coaching" target="_blank">
                 &copy; 2026 Andrea Bonvicin &mdash; gpx-visualizer &mdash; Licenza MIT
