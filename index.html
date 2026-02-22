@@ -163,14 +163,13 @@
         #elevation-chart {
             position: relative;
             background: #ffffff;
+            width: 100%;
+            box-sizing: border-box;
+            overflow: hidden;
             user-select: none;
             -webkit-user-select: none;
             touch-action: none;
             -webkit-touch-callout: none;
-            min-height: 120px;
-            width: 100%;
-            box-sizing: border-box;
-            overflow: hidden;
         }
 
         #elevation-chart svg text {
@@ -578,7 +577,7 @@
             .stat-value { font-size: 1.2rem; }
             .stat-unit  { font-size: 0.75rem; }
             #map { height: 55vw; min-height: 220px; max-height: 350px; }
-            /* elevation-chart: altezza auto via viewBox, nessuna height fissa */
+            /* elevation-chart height: gestita dal viewBox SVG */
             .upload-section { padding: 1.5rem 1rem; }
             .upload-zone { padding: 2rem 1rem; }
             .gradient-legend { padding: 0.5rem 0.75rem; font-size: 0.75rem; flex-wrap: wrap; gap: 0.5rem; }
@@ -1374,7 +1373,6 @@ let map;
                 if (!window._elevXScale || !window._elevMargin || !window._updateElevHover) return;
                 const touch = e.touches[0];
                 const rect = elevContainer.getBoundingClientRect();
-                // scala pixel reali → spazio SVG virtuale (viewBox 900px)
                 const scaleX = 900 / (rect.width || 900);
                 const mx = (touch.clientX - rect.left) * scaleX - window._elevMargin.left;
                 const maxX = 900 - window._elevMargin.left - window._elevMargin.right;
@@ -1423,8 +1421,6 @@ let map;
             if (_zoomStartMarker) { map.removeLayer(_zoomStartMarker); _zoomStartMarker = null; }
             if (_zoomEndMarker)   { map.removeLayer(_zoomEndMarker);   _zoomEndMarker = null; }
 
-            // viewBox fisso: D3 lavora in coordinate virtuali 900x290
-            // il browser scala l'SVG al 100% del container — clientWidth non serve
             const totalW = 900;
             const totalH = 290;
             const margin = { top: 20, right: 30, bottom: 50, left: 60 };
@@ -2011,7 +2007,7 @@ let map;
                         const maxEle = Math.max(...allEles);
                         const pad = (maxEle - minEle) * 0.08;
 
-                        const svgW = 900; // viewBox fisso, stesso spazio coordinato del grafico principale
+                        const svgW = 900; // stesso spazio viewBox del grafico principale
                         const margin = { top: 20, right: 30, bottom: 50, left: 60 };
                         const W = svgW - margin.left - margin.right;
                         const H = 290 - margin.top - margin.bottom;
