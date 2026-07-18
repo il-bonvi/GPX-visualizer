@@ -1995,7 +1995,8 @@ let map;
             const endOrigIdx   = fullData.findIndex(d => d.dist >  d1);
             const iEnd = endOrigIdx === -1 ? fullData.length : endOrigIdx;
 
-            for (let i = Math.max(1, startOrigIdx); i < iEnd; i++) {
+            const iEndExt = Math.min(iEnd + 1, fullData.length - 1);
+            for (let i = Math.max(1, startOrigIdx); i <= iEndExt; i++) {
                 const p1 = fullData[i-1], p2 = fullData[i];
                 const color = getGradientColor(smG[i]);
                 const path = `M${xScale(p1.dist)},${yScale(p1.eleSmooth)} L${xScale(p2.dist)},${yScale(p2.eleSmooth)} L${xScale(p2.dist)},${H} L${xScale(p1.dist)},${H} Z`;
